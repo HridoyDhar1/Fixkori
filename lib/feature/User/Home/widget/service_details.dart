@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 import 'package:serviceapp/core/widgets/custom_elevatedbutton.dart';
 
 import '../../../Admin/Auth/data/model/admin_model.dart';
-
 import '../../../chat/presentaion/widget/chat_screen.dart';
 import '../../Company/screen/company_profile.dart';
 import '../../Search/wiget/order_details.dart';
@@ -25,7 +24,6 @@ class ServiceDetailsScreen extends StatefulWidget {
 class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
   DateTime? selectedDate;
   TimeOfDay? selectedTime;
-
   Map<String, dynamic>? providerData;
 
   @override
@@ -73,6 +71,8 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
     );
     if (time != null) setState(() => selectedTime = time);
   }
+
+  // Fixed Chat Function
   Future<void> _openChat() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -90,45 +90,59 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
     final providerName = providerData?["name"] ?? "Service Provider";
     final providerImageUrl = providerData?["profileImage"] ?? "";
 
-    final chatsRef = FirebaseFirestore.instance
+    // Generate a consistent chat ID for this user-provider pair
+    final chatId = _generateChatId(user.uid, providerId);
+
+    final chatRef = FirebaseFirestore.instance
         .collection("serviceApp")
         .doc("appData")
-        .collection("chats");
+        .collection("chats")
+        .doc(chatId);
 
     // Check if chat exists
-    final existingChatQuery = await chatsRef
-        .where("userId", isEqualTo: user.uid)
-        .where("providerId", isEqualTo: providerId)
-        .limit(1)
-        .get();
+    final chatDoc = await chatRef.get();
 
-    String chatId;
-    if (existingChatQuery.docs.isNotEmpty) {
-      chatId = existingChatQuery.docs.first.id;
-
-      // Make sure userName and userImageUrl are updated
-      await chatsRef.doc(chatId).update({
-        "userName": user.displayName ?? "User",
-        "userImageUrl": user.photoURL ?? "",
-      });
-    } else {
-      // Create new chat
-      final newChatDoc = await chatsRef.add({
-        "userId": user.uid,
-        "providerId": providerId,
-        "userName": user.displayName ?? "User",
-        "providerName": providerName,
-        "userImageUrl": user.photoURL ?? "",
-        "providerImageUrl": providerImageUrl,
-        "serviceCard": {
+    if (!chatDoc.exists) {
+      // Create new chat document
+      await chatRef.set({
+        "participants": {
+          user.uid: {
+            "name": user.displayName ?? "User",
+            "imageUrl": user.photoURL ?? "",
+            "isProvider": false,
+          },
+          providerId: {
+            "name": providerName,
+            "imageUrl": providerImageUrl,
+            "isProvider": true,
+          }
+        },
+        "lastMessage": "",
+        "lastMessageTime": FieldValue.serverTimestamp(),
+        "serviceInfo": {
           "post": widget.service["post"] ?? "Untitled Service",
           "price": widget.service["price"] ?? "0",
           "imageUrl": widget.service["imageUrl"] ?? "",
         },
-        "lastMessage": "",
-        "lastMessageTime": FieldValue.serverTimestamp(),
+        "createdAt": FieldValue.serverTimestamp(),
       });
-      chatId = newChatDoc.id;
+
+      // Create subcollection for messages
+      await chatRef.collection("messages").add({
+        "type": "system",
+        "message": "Chat started",
+        "timestamp": FieldValue.serverTimestamp(),
+      });
+    } else {
+      // Update user info if it has changed
+      await chatRef.update({
+        "participants.${user.uid}": {
+          "name": user.displayName ?? "User",
+          "imageUrl": user.photoURL ?? "",
+          "isProvider": false,
+        },
+        "participants.$providerId.imageUrl": providerImageUrl,
+      });
     }
 
     // Navigate to chat screen
@@ -136,69 +150,16 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
       chatId: chatId,
       otherUserId: providerId,
       otherUserName: providerName,
+      service: widget.service,
     ));
   }
 
-  // Future<void> _openChat() async {
-  //   final user = FirebaseAuth.instance.currentUser;
-  //   if (user == null) {
-  //     Get.snackbar(
-  //       "Error",
-  //       "You must be logged in to chat",
-  //       snackPosition: SnackPosition.BOTTOM,
-  //       backgroundColor: Colors.redAccent,
-  //       colorText: Colors.white,
-  //     );
-  //     return;
-  //   }
-  //
-  //   // Provider info
-  //   final providerId = providerData?["userId"] ?? widget.service["userId"];
-  //   final providerName = providerData?["name"] ?? "Service Provider";
-  //   final providerImageUrl = providerData?["profileImage"] ?? "";
-  //
-  //   final chatsRef = FirebaseFirestore.instance
-  //       .collection("serviceApp")
-  //       .doc("appData")
-  //       .collection("chats");
-  //
-  //   // Check if chat already exists between this user and provider
-  //   final existingChatQuery = await chatsRef
-  //       .where("userId", isEqualTo: user.uid)
-  //       .where("providerId", isEqualTo: providerId)
-  //       .limit(1)
-  //       .get();
-  //
-  //   String chatId;
-  //   if (existingChatQuery.docs.isNotEmpty) {
-  //     chatId = existingChatQuery.docs.first.id;
-  //   } else {
-  //     final newChatDoc = await chatsRef.add({
-  //       "userId": user.uid,
-  //       "providerId": providerId,
-  //       "userName": user.displayName ?? "User",
-  //       "providerName": providerName,
-  //       "userImageUrl": user.photoURL ?? "",
-  //       "providerImageUrl": providerImageUrl,
-  //       "serviceCard": {
-  //         "post": widget.service["post"] ?? "Untitled Service",
-  //         "price": widget.service["price"] ?? "0",
-  //         "imageUrl": widget.service["imageUrl"] ?? "",
-  //       },
-  //       "lastMessage": "",
-  //       "lastMessageTime": FieldValue.serverTimestamp(),
-  //     });
-  //     chatId = newChatDoc.id;
-  //   }
-  //
-  //   // Navigate to single chat screen
-  //   Get.to(() => UserChatScreen(
-  //     chatId: chatId,
-  //     otherUserId: providerId, // Pass provider ID
-  //     otherUserName: providerName, // Pass provider name
-  //   ));
-  // }
-
+  // Generate consistent chat ID for a user-provider pair
+  String _generateChatId(String userId, String providerId) {
+    // Sort IDs alphabetically to ensure consistent chat ID
+    final sortedIds = [userId, providerId]..sort();
+    return '${sortedIds[0]}_${sortedIds[1]}';
+  }
 
   // Place order
   Future<void> _placeOrder() async {
@@ -221,15 +182,13 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
 
       final orderData = {
         "userId": user.uid,
-        "serviceId": widget.service["id"] ??
-            widget.service["timestamp"].toString(),
+        "serviceId": widget.service["id"] ?? widget.service["timestamp"].toString(),
         "serviceName": widget.service["post"] ?? "Untitled Service",
         "price": widget.service["price"] ?? "0",
         "location": widget.service["location"] ?? "No location",
         "imageUrl": widget.service["imageUrl"],
         "date": selectedDate!.toIso8601String(),
-        "time":
-        "${selectedTime!.hour}:${selectedTime!.minute.toString().padLeft(2, '0')}",
+        "time": "${selectedTime!.hour}:${selectedTime!.minute.toString().padLeft(2, '0')}",
         "status": "pending",
         "providerUserId": providerId,
         "providerEmail": providerData?["email"] ?? widget.service["userEmail"],
@@ -262,7 +221,6 @@ class _ServiceDetailsScreenState extends State<ServiceDetailsScreen> {
         context,
         MaterialPageRoute(
           builder: (context) => BookingConfirmationScreen(
-
             service: widget.service,
             selectedDate: selectedDate,
             selectedTime: selectedTime,

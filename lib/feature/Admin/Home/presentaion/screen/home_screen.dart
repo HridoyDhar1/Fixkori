@@ -44,23 +44,62 @@ class _HomeScreenAdminState extends State<HomeScreenAdmin> {
   }
 
   /// Listen for unread messages for this admin
+  /// Listen for unread messages for this admin
   void _listenUnreadMessages() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
+    // Listen for unread messages in all chats where admin is a participant
     FirebaseFirestore.instance
         .collection('serviceApp')
         .doc('appData')
-        .collection('messages')
-        .where('receiverId', isEqualTo: user.uid)
-        .where('isRead', isEqualTo: false)
+        .collection('chats')
+        .where('participants.${user.uid}', isNull: false)
         .snapshots()
-        .listen((snapshot) {
-      setState(() {
-        unreadMessages = snapshot.docs.length;
-      });
+        .listen((chatSnapshot) {
+      int totalUnread = 0;
+
+      // For each chat, check unread messages
+      for (final chatDoc in chatSnapshot.docs) {
+        final chatId = chatDoc.id;
+
+        // Listen for unread messages in this specific chat
+        FirebaseFirestore.instance
+            .collection('serviceApp')
+            .doc('appData')
+            .collection('chats')
+            .doc(chatId)
+            .collection('messages')
+            .where('senderId', isNotEqualTo: user.uid) // Messages from others
+            .where('read', isEqualTo: false) // Unread messages
+            .snapshots()
+            .listen((messageSnapshot) {
+          setState(() {
+            // Update total unread count
+            totalUnread += messageSnapshot.docs.length;
+            unreadMessages = totalUnread;
+          });
+        });
+      }
     });
   }
+  // void _listenUnreadMessages() {
+  //   final user = FirebaseAuth.instance.currentUser;
+  //   if (user == null) return;
+  //
+  //   FirebaseFirestore.instance
+  //       .collection('serviceApp')
+  //       .doc('appData')
+  //       .collection('messages')
+  //       .where('receiverId', isEqualTo: user.uid)
+  //       .where('isRead', isEqualTo: false)
+  //       .snapshots()
+  //       .listen((snapshot) {
+  //     setState(() {
+  //       unreadMessages = snapshot.docs.length;
+  //     });
+  //   });
+  // }
 
   /// Get icon path automatically based on name
   String _getIconForService(String name) {
@@ -310,7 +349,8 @@ class _HomeScreenAdminState extends State<HomeScreenAdmin> {
                         ),
                       ],
                     ),
-                    // ✅ Chat button with badge
+                    // // ✅ Chat button with badge
+                    // ✅ Chat button with badge - Enhanced version
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
@@ -321,29 +361,31 @@ class _HomeScreenAdminState extends State<HomeScreenAdmin> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => AdminChatList(),
+                                  builder: (context) => AdminChatListScreen(),
                                 ),
                               );
                             }
                           },
-                          icon: const Icon(Icons.message, color: Colors.white),
+                          icon: const Icon(Icons.message, color: Colors.black), // Changed to black for better visibility
+                          iconSize: 28,
                         ),
                         if (unreadMessages > 0)
                           Positioned(
-                            right: 4,
-                            top: 4,
+                            right: 6,
+                            top: 6,
                             child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: const BoxDecoration(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
                                 color: Colors.red,
                                 shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
                               ),
                               constraints: const BoxConstraints(
-                                minWidth: 16,
-                                minHeight: 16,
+                                minWidth: 18,
+                                minHeight: 18,
                               ),
                               child: Text(
-                                '$unreadMessages',
+                                unreadMessages > 9 ? '9+' : '$unreadMessages',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 10,
@@ -355,6 +397,50 @@ class _HomeScreenAdminState extends State<HomeScreenAdmin> {
                           ),
                       ],
                     ),
+                    // Stack(
+                    //   clipBehavior: Clip.none,
+                    //   children: [
+                    //     IconButton(
+                    //       onPressed: () {
+                    //         final user = FirebaseAuth.instance.currentUser;
+                    //         if (user != null) {
+                    //           Navigator.push(
+                    //             context,
+                    //             MaterialPageRoute(
+                    //               builder: (context) => AdminChatListScreen(),
+                    //             ),
+                    //           );
+                    //         }
+                    //       },
+                    //       icon: const Icon(Icons.message, color: Colors.white),
+                    //     ),
+                    //     if (unreadMessages > 0)
+                    //       Positioned(
+                    //         right: 4,
+                    //         top: 4,
+                    //         child: Container(
+                    //           padding: const EdgeInsets.all(2),
+                    //           decoration: const BoxDecoration(
+                    //             color: Colors.red,
+                    //             shape: BoxShape.circle,
+                    //           ),
+                    //           constraints: const BoxConstraints(
+                    //             minWidth: 16,
+                    //             minHeight: 16,
+                    //           ),
+                    //           child: Text(
+                    //             '$unreadMessages',
+                    //             style: const TextStyle(
+                    //               color: Colors.white,
+                    //               fontSize: 10,
+                    //               fontWeight: FontWeight.bold,
+                    //             ),
+                    //             textAlign: TextAlign.center,
+                    //           ),
+                    //         ),
+                    //       ),
+                    //   ],
+                    // ),
 
                   ],
                 ),

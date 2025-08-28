@@ -137,7 +137,7 @@ class UserProfileScreen extends StatelessWidget {
 
                   // Menu Items
                   _menuItem(Icons.handshake, "Register as a Partner",onTap: (){
-                    // Navigator.push(context, MaterialPageRoute(builder: (context)=>UserBookingListScreen()));
+                    Navigator.push(context, MaterialPageRoute(builder: (context)=>BookingListScreen()));
                   }),
 
                   _menuItem(Icons.help_outline, "Help Center"),

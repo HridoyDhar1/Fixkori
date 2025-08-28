@@ -26,7 +26,7 @@ class CustomUserNavigationScreen extends StatelessWidget {
           children: [
             UserHomeScreen(),
             SearchScreen(),
-     UserChatList(),
+ChatListScreen(),
             UserProfileScreen(),
           ],
         );

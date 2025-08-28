@@ -1,9 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../widget/order_details.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
-  const AdminOrdersScreen({super.key});
+  final VoidCallback? onOrdersViewed;
+  const AdminOrdersScreen({super.key, this.onOrdersViewed});
 
   @override
   State<AdminOrdersScreen> createState() => _AdminOrdersScreenState();
@@ -18,6 +22,14 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         .collection("orders")
         .doc(orderId)
         .update({"status": status});
+  }
+  @override
+  void initState() {
+    super.initState();
+    // Call the callback when orders screen is first opened
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onOrdersViewed?.call();
+    });
   }
 
   @override
@@ -86,78 +98,73 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 statusColor = Colors.orange;
               }
 
-              return Container(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // leading avatar
-                    CircleAvatar(
-                      radius: 25,
-                      backgroundColor: Colors.white,
-                      child: (data["imageUrl"] != null &&
-                          data["imageUrl"].toString().isNotEmpty)
-                          ? ClipRRect(
-                        borderRadius: BorderRadius.circular(25),
-                        child: Image.network(
-                          data["imageUrl"],
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(Icons.notifications, size: 30);
-                          },
-                        ),
-                      )
-                          : const Icon(Icons.notifications, size: 30,color: Colors.pink,),
-                    ),
-                    const SizedBox(width: 12),
-
-                    // text content
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            data["serviceName"] ?? "No Name",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+              return InkWell(
+                onTap: () {
+                  Get.to(() => AdminBookingDetailsScreen(
+                    orderId: order.id,
+                    bookingData: data,
+                  ));
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // leading avatar
+                      CircleAvatar(
+                        radius: 25,
+                        backgroundColor: Colors.white,
+                        child: (data["imageUrl"] != null &&
+                            data["imageUrl"].toString().isNotEmpty)
+                            ? ClipRRect(
+                          borderRadius: BorderRadius.circular(25),
+                          child: Image.network(
+                            data["imageUrl"],
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(Icons.notifications, size: 30);
+                            },
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "Date: ${data["date"]}\nTime: ${data["time"]}",
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            "Status: ${status.toUpperCase()}",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: statusColor,
-                            ),
-                          ),
-                        ],
+                        )
+                            : const Icon(Icons.notifications, size: 30,color: Colors.pink,),
                       ),
-                    ),
+                      const SizedBox(width: 12),
 
-                    // action buttons
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.check_circle, color: Colors.green),
-                          onPressed: () => updateOrder(order.id, "accepted"),
+                      // text content
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              data["serviceName"] ?? "No Name",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Date: ${data["date"]}\nTime: ${data["time"]}",
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              "Status: ${status.toUpperCase()}",
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: statusColor,
+                              ),
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.cancel, color: Colors.red),
-                          onPressed: () => updateOrder(order.id, "declined"),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+
+
+                    ],
+                  ),
                 ),
               );
             },
@@ -167,3 +174,4 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 }
+
